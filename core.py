@@ -8,6 +8,22 @@ BASE = Path(__file__).resolve().parent
 OUT = BASE / "output"
 OUT.mkdir(exist_ok=True)
 
+def _load_dotenv():
+    """Muat .env (KEY=VALUE) ke environ — stdlib only, tanpa python-dotenv.
+    .env tidak di-commit (lihat .gitignore); pakai .env.example sebagai acuan."""
+    try:
+        for line in (BASE / ".env").read_text().splitlines():
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            k, v = line.split("=", 1)
+            k, v = k.strip(), v.strip().strip("'\"")
+            if k and k not in os.environ:
+                os.environ[k] = v
+    except FileNotFoundError:
+        pass
+_load_dotenv()
+
 NIM_HOST = "integrate.api.nvidia.com"
 NIM_MODEL = os.getenv("NIM_MODEL", "nvidia/nemotron-3-super-120b-a12b")
 # model non-reasoning untuk tugas JSON (lebih patuh format)
