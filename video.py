@@ -56,7 +56,14 @@ def make_scene(name: str, visual: str, durasi: float, vertikal: bool = True) -> 
     for prov in _video_chain():
         if prov == "kenburns":
             return _kenburns(name, visual, durasi, w, h, mp4)
-        # adapter provider berbayar masa depan: raise NotImplementedError -> skip
+        # Adapter provider berbayar: file vid_<nama>.py dengan fungsi
+        # generate(name, visual, durasi, vertikal, mp4) -> str path mp4.
+        # Belum ada / gagal -> lanjut ke provider berikutnya.
+        try:
+            mod = __import__(f"vid_{prov}", fromlist=["generate"])
+            return mod.generate(name, visual, durasi, vertikal, mp4)
+        except Exception:
+            continue
     return _kenburns(name, visual, durasi, w, h, mp4)
 
 def _kenburns(name: str, visual: str, durasi: float, w: int, h: int, mp4: str) -> str:

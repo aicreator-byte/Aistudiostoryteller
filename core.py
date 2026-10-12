@@ -22,6 +22,35 @@ def _load_dotenv():
                 os.environ[k] = v
     except FileNotFoundError:
         pass
+
+def read_env_file() -> dict:
+    """Baca .env jadi dict (untuk halaman Pengaturan)."""
+    d: dict[str, str] = {}
+    try:
+        for line in (BASE / ".env").read_text().splitlines():
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            k, v = line.split("=", 1)
+            d[k.strip()] = v.strip().strip("'\"")
+    except FileNotFoundError:
+        pass
+    return d
+
+def write_env_file(updates: dict[str, str]):
+    """Tulis ulang .env. Nilai kosong = pertahankan yang lama."""
+    data = read_env_file()
+    for k, v in updates.items():
+        if v:
+            data[k] = v
+    (BASE / ".env").write_text("".join(f"{k}={v}\n" for k, v in data.items()))
+
+def reload_env():
+    """Muat ulang .env + reset cache key (dipanggil setelah Pengaturan disimpan)."""
+    global _NIM
+    _load_dotenv()
+    _NIM = None
+
 _load_dotenv()
 
 NIM_MODEL = os.getenv("NIM_MODEL", "nvidia/nemotron-3-super-120b-a12b")

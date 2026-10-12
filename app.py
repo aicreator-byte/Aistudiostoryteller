@@ -145,7 +145,8 @@ select{background:#0d1126;color:#fff;border:1px solid #2a3360;border-radius:10px
 def page(title, body, js="", nav="home"):
     navh = f"""<div class="top"><div class="logo">🎬 Storyteller <span>AI Studio</span></div>
 <nav><a href="{{B}}/\" class="{'on' if nav=='home' else ''}">Beranda</a>
-<a href="{{B}}/channel" class="{'on' if nav=='channel' else ''}">Channel</a></nav></div>"""
+<a href="{{B}}/channel" class="{'on' if nav=='channel' else ''}">Channel</a>
+<a href="{{B}}/pengaturan" class="{'on' if nav=='pengaturan' else ''}">⚙️ Pengaturan</a></nav></div>"""
     return f"""<!DOCTYPE html><html lang="id"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>{title}</title>
 <style>{CSS}</style></head><body>{navh}<div class="wrap">{body}</div>
@@ -626,6 +627,19 @@ class H(BaseHTTPRequestHandler):
             self._send(redir("/")); return
         if p == "/channel":
             self._send(v_channel()); return
+        if p == "/pengaturan" or p == "/pengaturan/ok":
+            self._send(v_pengaturan(saved=p.endswith("/ok"))); return
+        if p.startswith("/simpan/"):
+            blob = unquote(p[len("/simpan/"):])
+            updates = {}
+            for pair in blob.split("&"):
+                if "=" in pair:
+                    k, v = pair.split("=", 1)
+                    if k.strip() and v:
+                        updates[k.strip()] = v
+            write_env_file(updates)
+            reload_env()
+            self._send(redir("/pengaturan/ok")); return
         if p.startswith("/channel-buat/"):
             nama = unquote(p[len("/channel-buat/"):].split("/")[0])
             if nama:
@@ -669,6 +683,67 @@ class H(BaseHTTPRequestHandler):
 
     def log_message(self, *a):
         pass
+
+
+# ---------------------------------------------------------------- PENGATURAN
+from core import read_env_file, write_env_file, reload_env
+
+PENGATURAN = [
+    ("🤖 LLM — pembuat naskah & prompt video", [
+        ("LLM_CHAIN", "Urutan fallback (koma)", "text",
+         "nvidia,openrouter — provider: nvidia, openrouter, 9router, omniroute"),
+        ("NVIDIA_API_KEY", "NVIDIA API key", "password", ""),
+        ("NIM_MODEL", "Model NVIDIA", "text", ""),
+        ("OPENROUTER_API_KEY", "OpenRouter API key", "password", ""),
+        ("OPENROUTER_MODEL", "Model OpenRouter", "text", ""),
+    ]),
+    ("🎬 Video AI — pembuat video per adegan", [
+        ("VIDEO_CHAIN", "Urutan provider (koma)", "text",
+         "kenburns = slideshow foto+zoom (gratis, selalu jalan)"),
+        ("KLING_API_KEY", "Kling API key", "password", "segera — adapter belum ada"),
+        ("MINIMAX_API_KEY", "MiniMax/Hailuo API key", "password", "segera — adapter belum ada"),
+        ("RUNWAY_API_KEY", "Runway API key", "password", "segera — adapter belum ada"),
+        ("LUMA_API_KEY", "Luma API key", "password", "segera — adapter belum ada"),
+    ]),
+]
+
+def _mask(v: str) -> str:
+    return v[:4] + "…" + v[-4:] if len(v) > 10 else ("••••" if v else "")
+
+def v_pengaturan(saved=False):
+    env = read_env_file()
+    sects = []
+    for title, fields in PENGATURAN:
+        rows = []
+        for key, label, typ, hint in fields:
+            cur = env.get(key, "")
+            if typ == "password":
+                inp = (f"<input type='password' data-k='{key}' placeholder="
+                       f"'{('tersimpan: '+_mask(cur)) if cur else 'belum diisi'}'>")
+            else:
+                inp = (f"<input type='text' data-k='{key}' value='{cur}' "
+                       f"placeholder='{hint}'>")
+            note = (f"<p class='sub'>{hint}</p>"
+                    if typ == "text" and hint and not cur else "")
+            soon = (f"<p class='sub'>⏳ {hint}</p>"
+                    if typ == "password" and hint else "")
+            rows.append(f"<div class='secttl'>{label} <span class='chip'>{key}</span></div>{inp}{note}{soon}")
+        sects.append(f"<div class='card'><h2>{title}</h2>{''.join(rows)}</div>")
+    ok = ("<div class='card grad'><b>✅ Tersimpan ke .env</b>"
+          "<p class='sub' style='color:#e6e1ff'>Berlaku segera, tanpa restart.</p></div>"
+          if saved else "")
+    body = f"""<h1>⚙️ Pengaturan</h1>
+<p class="sub">API key & urutan provider. Disimpan ke file <span class="chip">.env</span> (tidak ikut ke GitHub).</p>
+{ok}{''.join(sects)}
+<div class="card"><div class="row"><button onclick="simpan()">💾 Simpan</button>
+<button class="ghost" onclick="location.href=BASE+'/'">Batal</button></div>
+<p class="sub">Kolom key yang dikosongkan = pertahankan nilai lama.</p></div>"""
+    js = """function simpan(){var ps=[];
+document.querySelectorAll('[data-k]').forEach(e=>{var v=e.value.trim();
+if(v)ps.push(encodeURIComponent(e.dataset.k+'='+v));});
+if(!ps.length){alert('Tidak ada perubahan');return;}
+location.href=BASE+'/simpan/'+ps.join('&');}"""
+    return page("Pengaturan", body, js, nav="pengaturan")
 
 if __name__ == "__main__":
     _load_jobs()
