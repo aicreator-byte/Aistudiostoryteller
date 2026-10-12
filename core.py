@@ -24,7 +24,6 @@ def _load_dotenv():
         pass
 _load_dotenv()
 
-NIM_HOST = "integrate.api.nvidia.com"
 NIM_MODEL = os.getenv("NIM_MODEL", "nvidia/nemotron-3-super-120b-a12b")
 # model non-reasoning untuk tugas JSON (lebih patuh format)
 JSON_MODEL = os.getenv("NIM_JSON_MODEL", "meta/llama-3.2-11b-vision-instruct")
@@ -36,25 +35,93 @@ def _nim_key() -> str:
     env = os.getenv("NVIDIA_API_KEY", "").strip()
     if env:  # server generik: pakai env var langsung
         _NIM = env; return _NIM
-    sys.path.insert(0, "/opt/hatch/skills/skill-creator/bin")
-    from dynamic_credentials import dynamic_credential_entry
-    _NIM = str(dynamic_credential_entry("custom.nvidia-nim")["surrogate"]).strip()
+    try:
+        sys.path.insert(0, "/opt/hatch/skills/skill-creator/bin")
+        from dynamic_credentials import dynamic_credential_entry
+        _NIM = str(dynamic_credential_entry("custom.nvidia-nim")["surrogate"]).strip()
+    except Exception:
+        _NIM = ""
     return _NIM
 
-def llm(prompt: str, system: str = "", max_tokens: int = 1500, model: str | None = None) -> str:
+def _openrouter_key() -> str:
+    env = os.getenv("OPENROUTER_API_KEY", "").strip()
+    if env:
+        return env
+    try:
+        sys.path.insert(0, "/opt/hatch/skills/skill-creator/bin")
+        from dynamic_credentials import dynamic_credential_entry
+        return str(dynamic_credential_entry("custom.openrouter")["surrogate"]).strip()
+    except Exception:
+        return ""
+
+def _chat(base: str, key: str, model: str, prompt: str, system: str,
+          max_tokens: int, timeout: int = 180) -> str:
+    """Chat completions OpenAI-compatible via urllib (stdlib). Raise jika gagal."""
     msgs = []
     if system: msgs.append({"role": "system", "content": system})
     msgs.append({"role": "user", "content": prompt})
     req = urllib.request.Request(
-        f"https://{NIM_HOST}/v1/chat/completions",
-        data=json.dumps({"model": model or NIM_MODEL, "messages": msgs,
+        f"{base.rstrip('/')}/chat/completions",
+        data=json.dumps({"model": model, "messages": msgs,
                          "temperature": 0.7, "max_tokens": max_tokens}).encode(),
         headers={"Content-Type": "application/json",
-                 "Authorization": f"Bearer {_nim_key()}"})
-    with urllib.request.urlopen(req, timeout=300) as r:
+                 "Authorization": f"Bearer {key}",
+                 "HTTP-Referer": "https://storyteller.local",
+                 "X-Title": "Storyteller AI Studio"})
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        if r.status != 200:
+            raise RuntimeError(f"HTTP {r.status}")
         msg = json.load(r)["choices"][0]["message"]
-        # Nemotron/reasoning model: jawaban kadang di reasoning_content
-        return msg.get("content") or msg.get("reasoning_content") or ""
+        out = msg.get("content") or msg.get("reasoning_content") or ""
+        if not out.strip():
+            raise RuntimeError("respon kosong")
+        return out
+
+def _providers() -> list[tuple[str, str, str, str]]:
+    """Rantai fallback LLM dari env LLM_CHAIN.
+    Provider dikenal: nvidia, openrouter, 9router, omniroute.
+    Yang tak dikenal / tanpa key / endpoint mati -> di-skip otomatis."""
+    chain = [p.strip().lower() for p in
+             os.getenv("LLM_CHAIN", "nvidia,openrouter").split(",") if p.strip()]
+    provs = []
+    for p in chain:
+        if p == "nvidia":
+            k = _nim_key()
+            if k:
+                provs.append(("nvidia", "https://integrate.api.nvidia.com/v1",
+                              k, os.getenv("NIM_MODEL", "nvidia/nemotron-3-super-120b-a12b")))
+        elif p == "openrouter":
+            k = _openrouter_key()
+            m = os.getenv("OPENROUTER_MODEL", "google/gemma-4-26b-a4b-it:free").strip()
+            if k and m:
+                provs.append(("openrouter", "https://openrouter.ai/api/v1", k, m))
+        elif p == "9router":
+            provs.append(("9router", "http://127.0.0.1:20128",
+                          os.getenv("ROUTER9_KEY", "dummy"),
+                          os.getenv("ROUTER9_MODEL", "")))
+        elif p == "omniroute":
+            provs.append(("omniroute",
+                          os.getenv("OMNIROUTE_URL", "http://127.0.0.1:20129"),
+                          os.getenv("OMNIROUTE_KEY", "dummy"),
+                          os.getenv("OMNIROUTE_MODEL", "")))
+    return provs
+
+def llm(prompt: str, system: str = "", max_tokens: int = 1500,
+        model: str | None = None) -> str:
+    """Coba setiap provider berurutan; fallback otomatis saat gagal."""
+    errs = []
+    provs = _providers()
+    if not provs:
+        raise RuntimeError("tidak ada provider LLM aktif — cek LLM_CHAIN/.env")
+    for name, base, key, defmodel in provs:
+        try:
+            # override model hanya valid untuk nvidia (id model NIM);
+            # provider lain pakai model defaultnya sendiri
+            use_model = model if (model and name == "nvidia") else defmodel
+            return _chat(base, key, use_model, prompt, system, max_tokens)
+        except Exception as e:
+            errs.append(f"{name}: {str(e)[:70]}")
+    raise RuntimeError("semua provider LLM gagal — " + " | ".join(errs))
 
 def run(cmd: list[str], **kw) -> subprocess.CompletedProcess:
     return subprocess.run(cmd, capture_output=True, text=True, **kw)

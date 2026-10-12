@@ -22,8 +22,17 @@ Studio (render + ekspor + SEO) → Channel & kalender konten.
 
 - Python 3.10+, FFmpeg + FFprobe
 - `pip install gtts`
-- NVIDIA NIM API key (gratis): set env `NVIDIA_API_KEY`
+- API key LLM (salah satu): NVIDIA NIM gratis (`NVIDIA_API_KEY`)
+  atau OpenRouter (`OPENROUTER_API_KEY` — model `:free` tanpa kartu kredit)
 - CLI `image-search` (opsional — tanpa ini, adegan pakai pola mock)
+
+## Fallback provider
+
+`core.llm()` mencoba provider berurutan sesuai `LLM_CHAIN`
+(default: `nvidia,openrouter`). Gagal di satu → otomatis lanjut ke
+berikutnya. Provider yang didukung: `nvidia`, `openrouter`,
+`9router` (lokal :20128), `omniroute` (lokal, via `OMNIROUTE_URL`).
+Lihat `.env.example` untuk daftar variabel.
 
 ## Jalan cepat
 

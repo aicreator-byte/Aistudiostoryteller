@@ -4,7 +4,7 @@ Gambar asli (image search, sesuai deskripsi visual) + animasi Ken Burns
 Fallback: mock pola bila gambar tidak didapat.
 Format: 9:16 (Shorts) atau 16:9 (long)."""
 from __future__ import annotations
-import json, subprocess, urllib.request
+import json, os, subprocess, urllib.request
 from core import OUT, run, audio_duration
 
 def _search_image(query: str) -> str | None:
@@ -42,9 +42,24 @@ def _download(url: str, dest: str) -> bool:
     except Exception:
         return False
 
+def _video_chain() -> list[str]:
+    """Rantai provider video dari env VIDEO_CHAIN (default: kenburns).
+    Provider AI beneran (kling/hailuo/seedance/minimax/wan/luma/...) butuh
+    API key berbayar + implementasi adapter — belum ada; otomatis di-skip
+    ke kenburns yang selalu jalan."""
+    return [p.strip().lower() for p in
+            os.getenv("VIDEO_CHAIN", "kenburns").split(",") if p.strip()]
+
 def make_scene(name: str, visual: str, durasi: float, vertikal: bool = True) -> str:
     mp4 = str(OUT / f"{name}.mp4")
     w, h = (1080, 1920) if vertikal else (1920, 1080)
+    for prov in _video_chain():
+        if prov == "kenburns":
+            return _kenburns(name, visual, durasi, w, h, mp4)
+        # adapter provider berbayar masa depan: raise NotImplementedError -> skip
+    return _kenburns(name, visual, durasi, w, h, mp4)
+
+def _kenburns(name: str, visual: str, durasi: float, w: int, h: int, mp4: str) -> str:
     img = str(OUT / f"{name}.jpg")
     url = _search_image(visual)
     if url and _download(url, img):
