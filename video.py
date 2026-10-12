@@ -43,12 +43,35 @@ def _download(url: str, dest: str) -> bool:
         return False
 
 def _video_chain() -> list[str]:
-    """Rantai provider video dari env VIDEO_CHAIN (default: kenburns).
-    Provider AI beneran (kling/hailuo/seedance/minimax/wan/luma/...) butuh
-    API key berbayar + implementasi adapter — belum ada; otomatis di-skip
-    ke kenburns yang selalu jalan."""
+    """Rantai provider video dari env VIDEO_CHAIN.
+    Langsung: kling, minimax, runway, luma.
+    Aggregator: fal, replicate.
+    kenburns = slideshow foto+zoom (gratis, selalu jalan, fallback terakhir).
+    Adapter yang gagal -> otomatis lanjut ke berikutnya."""
     return [p.strip().lower() for p in
             os.getenv("VIDEO_CHAIN", "kenburns").split(",") if p.strip()]
+
+def _fit_duration(mp4: str, durasi: float) -> str:
+    """Samakan durasi klip AI dengan durasi narasi (potong / loop)."""
+    try:
+        d = audio_duration(mp4)
+    except Exception:
+        return mp4
+    if abs(d - durasi) < 0.4 or d <= 0:
+        return mp4
+    tmp = mp4.replace(".mp4", "_fit.mp4")
+    try:
+        if d > durasi:
+            run(["ffmpeg", "-y", "-v", "error", "-i", mp4,
+                 "-t", f"{durasi:.1f}", "-c", "copy", tmp], timeout=120)
+        else:
+            n = int(durasi // d) + 1
+            run(["ffmpeg", "-y", "-v", "error", "-stream_loop", str(n),
+                 "-i", mp4, "-t", f"{durasi:.1f}",
+                 "-c:v", "libx264", "-pix_fmt", "yuv420p", tmp], timeout=180)
+    except Exception:
+        return mp4
+    return tmp if os.path.exists(tmp) else mp4
 
 def make_scene(name: str, visual: str, durasi: float, vertikal: bool = True) -> str:
     mp4 = str(OUT / f"{name}.mp4")
@@ -61,7 +84,8 @@ def make_scene(name: str, visual: str, durasi: float, vertikal: bool = True) -> 
         # Belum ada / gagal -> lanjut ke provider berikutnya.
         try:
             mod = __import__(f"vid_{prov}", fromlist=["generate"])
-            return mod.generate(name, visual, durasi, vertikal, mp4)
+            raw = mod.generate(name, visual, durasi, vertikal, mp4)
+            return _fit_duration(raw, durasi)
         except Exception:
             continue
     return _kenburns(name, visual, durasi, w, h, mp4)

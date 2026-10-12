@@ -30,9 +30,16 @@ Studio (render + ekspor + SEO) → Channel & kalender konten.
 
 `core.llm()` mencoba provider berurutan sesuai `LLM_CHAIN`
 (default: `nvidia,openrouter`). Gagal di satu → otomatis lanjut ke
-berikutnya. Provider yang didukung: `nvidia`, `openrouter`,
-`9router` (lokal :20128), `omniroute` (lokal, via `OMNIROUTE_URL`).
+berikutnya. Provider langsung: `anthropic`, `openai`, `gemini`, `nvidia`.
+Via router: `openrouter`, `9router`, `omniroute`.
 Lihat `.env.example` untuk daftar variabel.
+
+`video.make_scene()` memakai rantai `VIDEO_CHAIN`: provider langsung
+(`kling`, `minimax`, `runway`, `luma`), aggregator (`fal`, `replicate`),
+dan `kenburns` (slideshow gratis, fallback terakhir yang selalu jalan).
+Adapter video AI ditulis dari dokumentasi publik dan **belum terverifikasi
+live** — butuh API key untuk tes. Durasi klip AI dinormalisasi ke durasi
+narasi otomatis (potong/loop).
 
 ## Jalan cepat
 

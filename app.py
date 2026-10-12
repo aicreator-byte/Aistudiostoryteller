@@ -707,11 +707,15 @@ PENGATURAN = [
     ]),
     ("🎬 Video AI — pembuat video per adegan", [
         ("VIDEO_CHAIN", "Urutan provider (koma)", "text",
-         "kenburns = slideshow foto+zoom (gratis, selalu jalan)"),
-        ("KLING_API_KEY", "Kling API key", "password", "segera — adapter belum ada"),
-        ("MINIMAX_API_KEY", "MiniMax/Hailuo API key", "password", "segera — adapter belum ada"),
-        ("RUNWAY_API_KEY", "Runway API key", "password", "segera — adapter belum ada"),
-        ("LUMA_API_KEY", "Luma API key", "password", "segera — adapter belum ada"),
+         "cth: fal,minimax,kenburns — langsung: kling,minimax,runway,luma · aggregator: fal,replicate"),
+        ("FAL_KEY", "fal.ai key (aggregator)", "password", ""),
+        ("FAL_MODEL", "Model fal.ai", "text", ""),
+        ("REPLICATE_API_TOKEN", "Replicate token (aggregator)", "password", ""),
+        ("REPLICATE_MODEL", "Model Replicate", "text", ""),
+        ("KLING_API_KEY", "Kling API key", "password", "stub — pakai fal/replicate untuk Kling"),
+        ("MINIMAX_API_KEY", "MiniMax/Hailuo API key", "password", ""),
+        ("RUNWAY_API_KEY", "Runway API key", "password", ""),
+        ("LUMA_API_KEY", "Luma API key", "password", ""),
     ]),
 ]
 
