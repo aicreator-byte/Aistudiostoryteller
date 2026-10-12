@@ -106,15 +106,77 @@ def _chat(base: str, key: str, model: str, prompt: str, system: str,
             raise RuntimeError("respon kosong")
         return out
 
-def _providers() -> list[tuple[str, str, str, str]]:
+def _env_key(name: str) -> str:
+    """Key dari .env/environ saja (untuk provider langsung)."""
+    return os.getenv(name, "").strip()
+
+def _chat_anthropic(key: str, model: str, prompt: str, system: str,
+                    max_tokens: int, timeout: int = 180) -> str:
+    body: dict = {"model": model, "max_tokens": max_tokens,
+                  "messages": [{"role": "user", "content": prompt}]}
+    if system:
+        body["system"] = system
+    req = urllib.request.Request(
+        "https://api.anthropic.com/v1/messages",
+        data=json.dumps(body).encode(),
+        headers={"Content-Type": "application/json",
+                 "x-api-key": key,
+                 "anthropic-version": "2023-06-01"})
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        d = json.load(r)
+        parts = [b.get("text", "") for b in d.get("content", [])
+                 if b.get("type") == "text"]
+        out = "".join(parts).strip()
+        if not out:
+            raise RuntimeError("respon kosong")
+        return out
+
+def _chat_gemini(key: str, model: str, prompt: str, system: str,
+                 max_tokens: int, timeout: int = 180) -> str:
+    full = f"{system}\n\n{prompt}" if system else prompt
+    body = {"contents": [{"role": "user", "parts": [{"text": full}]}],
+            "generationConfig": {"maxOutputTokens": max_tokens,
+                                 "temperature": 0.7}}
+    req = urllib.request.Request(
+        f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
+        data=json.dumps(body).encode(),
+        headers={"Content-Type": "application/json",
+                 "x-goog-api-key": key})
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        d = json.load(r)
+        try:
+            out = d["candidates"][0]["content"]["parts"][0]["text"].strip()
+        except (KeyError, IndexError):
+            out = ""
+        if not out:
+            raise RuntimeError("respon kosong / diblokir")
+        return out
+
+def _providers() -> list:
     """Rantai fallback LLM dari env LLM_CHAIN.
-    Provider dikenal: nvidia, openrouter, 9router, omniroute.
-    Yang tak dikenal / tanpa key / endpoint mati -> di-skip otomatis."""
+    Langsung: anthropic, openai, gemini, nvidia.
+    Via router: openrouter, 9router, omniroute.
+    Yang tak dikenal / tanpa key -> di-skip otomatis."""
     chain = [p.strip().lower() for p in
              os.getenv("LLM_CHAIN", "nvidia,openrouter").split(",") if p.strip()]
     provs = []
     for p in chain:
-        if p == "nvidia":
+        if p == "anthropic":
+            k = _env_key("ANTHROPIC_API_KEY")
+            m = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-20250514").strip()
+            if k and m:
+                provs.append(("anthropic", k, m))
+        elif p == "openai":
+            k = _env_key("OPENAI_API_KEY")
+            m = os.getenv("OPENAI_MODEL", "gpt-4o").strip()
+            if k and m:
+                provs.append(("openai", "https://api.openai.com/v1", k, m))
+        elif p == "gemini":
+            k = _env_key("GEMINI_API_KEY") or _env_key("GOOGLE_API_KEY")
+            m = os.getenv("GEMINI_MODEL", "gemini-2.5-flash").strip()
+            if k and m:
+                provs.append(("gemini", k, m))
+        elif p == "nvidia":
             k = _nim_key()
             if k:
                 provs.append(("nvidia", "https://integrate.api.nvidia.com/v1",
@@ -142,10 +204,17 @@ def llm(prompt: str, system: str = "", max_tokens: int = 1500,
     provs = _providers()
     if not provs:
         raise RuntimeError("tidak ada provider LLM aktif — cek LLM_CHAIN/.env")
-    for name, base, key, defmodel in provs:
+    for prov in provs:
+        name = prov[0]
         try:
-            # override model hanya valid untuk nvidia (id model NIM);
-            # provider lain pakai model defaultnya sendiri
+            if name == "anthropic":
+                _, key, defmodel = prov
+                return _chat_anthropic(key, defmodel, prompt, system, max_tokens)
+            if name == "gemini":
+                _, key, defmodel = prov
+                return _chat_gemini(key, defmodel, prompt, system, max_tokens)
+            _, base, key, defmodel = prov
+            # override model hanya valid untuk nvidia (id model NIM)
             use_model = model if (model and name == "nvidia") else defmodel
             return _chat(base, key, use_model, prompt, system, max_tokens)
         except Exception as e:

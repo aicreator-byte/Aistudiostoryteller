@@ -689,9 +689,17 @@ class H(BaseHTTPRequestHandler):
 from core import read_env_file, write_env_file, reload_env
 
 PENGATURAN = [
+    ("⚡ LLM langsung — tanpa router", [
+        ("ANTHROPIC_API_KEY", "Anthropic API key (Claude)", "password", ""),
+        ("ANTHROPIC_MODEL", "Model Claude", "text", ""),
+        ("OPENAI_API_KEY", "OpenAI API key (GPT)", "password", ""),
+        ("OPENAI_MODEL", "Model GPT", "text", ""),
+        ("GEMINI_API_KEY", "Google API key (Gemini)", "password", ""),
+        ("GEMINI_MODEL", "Model Gemini", "text", ""),
+    ]),
     ("🤖 LLM — pembuat naskah & prompt video", [
         ("LLM_CHAIN", "Urutan fallback (koma)", "text",
-         "nvidia,openrouter — provider: nvidia, openrouter, 9router, omniroute"),
+         "cth: anthropic,openai,gemini,nvidia,openrouter"),
         ("NVIDIA_API_KEY", "NVIDIA API key", "password", ""),
         ("NIM_MODEL", "Model NVIDIA", "text", ""),
         ("OPENROUTER_API_KEY", "OpenRouter API key", "password", ""),
