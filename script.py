@@ -1,4 +1,4 @@
-"""Tahap 2a: Naskah per adegan. Judul+hook -> daftar adegan (visual prompt + narasi)."""
+"""Tahap 2a: Naskah per adegan. Judul+hook -> daftar adegan (storyboard + prompt video + narasi)."""
 from __future__ import annotations
 from core import llm, parse_json, JSON_MODEL
 
@@ -12,7 +12,8 @@ def make_script(judul: str, hook: str, ide: str, durasi_target: int = 60,
 Judul: {judul}
 Hook: {hook}
 Ide: {ide}
-Bagi jadi {n_adegan} adegan. Setiap adegan: {{"visual": "prompt gambar {gaya}, tokoh konsisten, 1 kalimat Inggris",
+Bagi jadi {n_adegan} adegan. Setiap adegan: {{"visual": "STORYBOARD: komposisi, framing, gaya {gaya}, tokoh konsisten, 1 kalimat Inggris",
+"video": "PROMPT VIDEO AI: gerakan kamera + motion subjek + mood/suasana, 1-2 kalimat Inggris, tanpa dialog",
 "narasi": "teks dibacakan 1-2 kalimat Indonesia (maks ~25 kata)"}}.
 Narasi total pas untuk {durasi_target} detik (±150 kata per menit).
 Output: array JSON saja."""
@@ -28,5 +29,7 @@ Output: array JSON saja."""
     # normalisasi key
     out = []
     for s in scenes:
-        out.append({"visual": s.get("visual", ""), "narasi": s.get("narasi", "")})
+        out.append({"visual": s.get("visual", ""),
+                    "video": s.get("video", ""),
+                    "narasi": s.get("narasi", "")})
     return out

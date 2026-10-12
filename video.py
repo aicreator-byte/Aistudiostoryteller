@@ -73,22 +73,26 @@ def _fit_duration(mp4: str, durasi: float) -> str:
         return mp4
     return tmp if os.path.exists(tmp) else mp4
 
-def make_scene(name: str, visual: str, durasi: float, vertikal: bool = True) -> str:
+def make_scene(name: str, prompt: str, durasi: float, vertikal: bool = True,
+               storyboard: str = "") -> str:
+    """Buat klip adegan. prompt = prompt video AI; storyboard = deskripsi
+    statis (Ken Burns pakai ini untuk cari foto; default = prompt)."""
     mp4 = str(OUT / f"{name}.mp4")
     w, h = (1080, 1920) if vertikal else (1920, 1080)
+    sb = storyboard or prompt
     for prov in _video_chain():
         if prov == "kenburns":
-            return _kenburns(name, visual, durasi, w, h, mp4)
+            return _kenburns(name, sb, durasi, w, h, mp4)
         # Adapter provider berbayar: file vid_<nama>.py dengan fungsi
-        # generate(name, visual, durasi, vertikal, mp4) -> str path mp4.
+        # generate(name, prompt, durasi, vertikal, mp4) -> str path mp4.
         # Belum ada / gagal -> lanjut ke provider berikutnya.
         try:
             mod = __import__(f"vid_{prov}", fromlist=["generate"])
-            raw = mod.generate(name, visual, durasi, vertikal, mp4)
+            raw = mod.generate(name, prompt, durasi, vertikal, mp4)
             return _fit_duration(raw, durasi)
         except Exception:
             continue
-    return _kenburns(name, visual, durasi, w, h, mp4)
+    return _kenburns(name, sb, durasi, w, h, mp4)
 
 def _kenburns(name: str, visual: str, durasi: float, w: int, h: int, mp4: str) -> str:
     img = str(OUT / f"{name}.jpg")
@@ -109,5 +113,6 @@ def _kenburns(name: str, visual: str, durasi: float, w: int, h: int, mp4: str) -
              mp4], timeout=120)
     return mp4
 
-def scene_for_narration(name: str, visual: str, mp3: str, vertikal: bool = True) -> str:
-    return make_scene(name, visual, audio_duration(mp3), vertikal)
+def scene_for_narration(name: str, prompt: str, mp3: str, vertikal: bool = True,
+                        storyboard: str = "") -> str:
+    return make_scene(name, prompt, audio_duration(mp3), vertikal, storyboard)

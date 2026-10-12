@@ -288,7 +288,8 @@ def v_skrip(jid):
     cards = []
     for i, s in enumerate(j["scenes"]):
         cards.append(f"""<div class="scene"><h3>Adegan {i+1}</h3>
-<div class="lbl">Alur (visual)</div><textarea id="v{i}" rows="2">{s['visual']}</textarea>
+<div class="lbl">Storyboard (visual statis)</div><textarea id="v{i}" rows="2">{s['visual']}</textarea>
+<div class="lbl">Prompt video AI (gerakan kamera + motion)</div><textarea id="p{i}" rows="2">{s.get('video','')}</textarea>
 <div class="lbl">Narasi</div><textarea id="n{i}" rows="3">{s['narasi']}</textarea>
 <div class="row"><button class="ghost sm" onclick="save({i})">Simpan adegan {i+1}</button>
 <span class="badge" id="b{i}">belum disimpan</span></div></div>""")
@@ -299,13 +300,10 @@ def v_skrip(jid):
 {''.join(cards)}
 <div class="card"><button onclick="collect()">Lanjut ke Daftar Adegan →</button></div>"""
     js = f"""var N={n};
-function save(i){{var v=encodeURIComponent(document.getElementById('v'+i).value);
-var n=encodeURIComponent(document.getElementById('n'+i).value);
-fetch(BASE+'/save/{jid}/'+i+'/'+v+'/'+n).then(()=>{{var b=document.getElementById('b'+i);
+function val(id){{return encodeURIComponent(document.getElementById(id).value);}}
+function save(i){{fetch(BASE+'/save/{jid}/'+i+'/'+val('v'+i)+'/'+val('n'+i)+'/'+val('p'+i)).then(()=>{{var b=document.getElementById('b'+i);
 b.textContent='tersimpan';b.className='badge ok';}});}}
-async function collect(){{for(let i=0;i<N;i++){{var v=encodeURIComponent(document.getElementById('v'+i).value);
-var n=encodeURIComponent(document.getElementById('n'+i).value);
-await fetch(BASE+'/save/{jid}/'+i+'/'+v+'/'+n);}}location.href=BASE+'/adegan/{jid}';}}"""
+async function collect(){{for(let i=0;i<N;i++){{await fetch(BASE+'/save/{jid}/'+i+'/'+val('v'+i)+'/'+val('n'+i)+'/'+val('p'+i));}}location.href=BASE+'/adegan/{jid}';}}"""
     return page("Skrip", body, js)
 
 # ---------------------------------------------------------------- ADEGAN (Daftar adegan)
@@ -316,7 +314,8 @@ def _gen_scene(jid, idx):
         s["status"] = "jalan"; _save_jobs()
         tag = f"{jid}_s{idx+1}"
         mp3, words = synthesize(s["narasi"], tag)
-        mp4 = scene_for_narration(tag, s["visual"], mp3, j["fmt"] == "short")
+        mp4 = scene_for_narration(tag, s.get("video") or s["visual"], mp3,
+                                  j["fmt"] == "short", storyboard=s["visual"])
         s.update(mp3=mp3, mp4=mp4, words=words, status="siap")
     except Exception as e:
         s["status"] = f"gagal: {str(e)[:80]}"
@@ -347,7 +346,7 @@ def v_adegan(jid):
 <p class="sub">{s['narasi'][:110]}...</p>{vid}
 <div class="row">{btn}
 <button class="ghost sm" onclick="salinPrompt({i})">📋 Salin prompt</button></div>
-<textarea id="p{i}" style="display:none">{s['visual']}</textarea></div>""")
+<textarea id="p{i}" style="display:none">{s.get('video') or s['visual']}</textarea></div>""")
     n = len(j["scenes"]); done = sum(1 for s in j["scenes"] if s["status"] == "siap")
     pct = int(done / n * 100) if n else 0
     nxt = (f"<button onclick=\"location.href=BASE+'/studio/{jid}'\">Lanjut ke Studio →</button>"
@@ -574,6 +573,8 @@ class H(BaseHTTPRequestHandler):
                 if 0 <= idx < len(j.get("scenes", [])):
                     j["scenes"][idx]["visual"] = unquote(parts[2])
                     j["scenes"][idx]["narasi"] = unquote(parts[3])
+                    if len(parts) >= 5:
+                        j["scenes"][idx]["video"] = unquote(parts[4])
                     _save_jobs(); ok = True
             self._send('{"ok":true}' if ok else '{"ok":false}',
                        200 if ok else 404, "application/json"); return
