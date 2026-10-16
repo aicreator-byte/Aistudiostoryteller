@@ -1,10 +1,11 @@
 """Tahap 3: Video per adegan.
 Gambar asli (image search, sesuai deskripsi visual) + animasi Ken Burns
 (slow zoom) via FFmpeg — sinkron durasi narasi.
-Fallback: mock pola bila gambar tidak didapat.
+Rantai fallback: cari ulang dengan kata kunci lebih luas -> bila tetap
+kosong, latar sinematik dari warna & mood adegan (bukan pola generik).
 Format: 9:16 (Shorts) atau 16:9 (long)."""
 from __future__ import annotations
-import json, os, subprocess, urllib.request
+import json, os, re, subprocess, urllib.request
 from core import OUT, run, audio_duration
 
 def _search_image(query: str) -> str | None:
@@ -23,6 +24,80 @@ def _search_image(query: str) -> str | None:
     except Exception:
         pass
     return None
+
+# Kata kunci Indonesia -> Inggris untuk pencarian ulang yang lebih luas.
+_ID_EN = {
+    "kamar": "bedroom", "ruang": "room", "dapur": "kitchen", "kantor": "office",
+    "jalan": "street", "gang": "alley", "pasar": "market", "rumah": "house",
+    "pantai": "beach", "laut": "ocean", "gunung": "mountain", "hutan": "forest",
+    "sawah": "rice field", "langit": "sky", "kota": "city", "desa": "village",
+    "malam": "night", "pagi": "morning", "sore": "afternoon", "senja": "sunset",
+    "hujan": "rain", "api": "fire", "air": "water", "mobil": "car",
+    "motor": "motorcycle", "perahu": "boat", "kapal": "ship", "anak": "child",
+    "pria": "man", "wanita": "woman", "kakek": "old man", "nenek": "old woman",
+    "wajah": "face", "bunga": "flower", "pohon": "tree", "batu": "stone",
+    "tangga": "stairs", "pintu": "door", "jendela": "window", "meja": "table",
+    "lampu": "lamp", "lilin": "candle", "istana": "palace", "kastil": "castle",
+    "naga": "dragon", "hantu": "ghost", "raja": "king", "ratu": "queen",
+    "pangeran": "prince", "putri": "princess", "dokter": "doctor", "sekolah": "school",
+    "masjid": "mosque", "gereja": "church", "restoran": "restaurant", "kafe": "cafe",
+    "kopi": "coffee", "makanan": "food", "uang": "money", "emas": "gold",
+    "sungai": "river", "danau": "lake", "gurun": "desert", "salju": "snow",
+    "awan": "cloud", "bintang": "stars", "bulan": "moon", "matahari": "sun",
+    "badai": "storm", "petir": "lightning", "kabut": "fog", "asap": "smoke",
+    "taman": "garden", "kebun": "garden", "kucing": "cat", "anjing": "dog",
+    "burung": "bird", "ikan": "fish", "kuda": "horse",
+}
+_STOP = {"yang", "dan", "di", "ke", "dari", "dengan", "untuk", "pada", "sebuah",
+        "seorang", "para", "ini", "itu", "adalah", "sebagai", "dalam", "saat",
+        "ketika", "sambil", "lalu", "kemudian", "sangat", "lebih", "tanpa",
+        "seperti", "akan", "telah", "sudah", "sedang", "tak", "tidak", "ada"}
+
+def _broad_queries(visual: str) -> list[str]:
+    """Urutan pencarian: teks asli -> kata kunci Inggris -> 2-3 kata terluas."""
+    words = [w for w in re.findall(r"[a-z]+", visual.lower()) if w not in _STOP]
+    mapped = [_ID_EN.get(w, w) for w in words]
+    out = [visual.strip()]
+    en = " ".join(mapped).strip()
+    if en and en.lower() != visual.strip().lower():
+        out.append(en)
+    nouns = [w for w in mapped if w in set(_ID_EN.values())]
+    broad = " ".join((nouns or mapped)[-3:]).strip()
+    if broad and broad not in out:
+        out.append(broad)
+    return [q for q in out if q]
+
+# Mood adegan -> pasangan warna latar sinematik (gelap -> terang).
+_MOODS = [
+    (("malam", "night", "gelap", "dark"), ("0x0a0f24", "0x1c2a4d")),
+    (("senja", "sunset", "terbenam"), ("0x2b1a4d", "0xc9712f")),
+    (("sedih", "sad", "duka", "muram"), ("0x182230", "0x3d4c5c")),
+    (("bahagia", "happy", "ceria", "joy"), ("0x3d2d17", "0xc9a24e")),
+    (("romantis", "romantic", "cinta", "love"), ("0x2e1a30", "0xa34e6e")),
+    (("tegang", "tense", "horor", "horror", "seram", "misteri"), ("0x140b0b", "0x5c1515")),
+    (("pagi", "morning", "fajar", "dawn"), ("0x2a3a4d", "0xd9c9a8")),
+    (("hujan", "rain"), ("0x1d2833", "0x5c6e7e")),
+    (("laut", "ocean", "sea", "pantai", "beach"), ("0x0a2b3d", "0x1f6e8c")),
+    (("hutan", "forest", "taman", "garden"), ("0x0e2b1a", "0x2f5c3d")),
+]
+
+def _mood_colors(visual: str) -> tuple[str, str]:
+    v = visual.lower()
+    for keys, colors in _MOODS:
+        if any(k in v for k in keys):
+            return colors
+    return ("0x14141d", "0x30303d")  # sinematik netral
+
+def _mood_background(img: str, w: int, h: int, c0: str, c1: str) -> bool:
+    """Latar gradien sinematik + vignette + grain halus."""
+    try:
+        run(["ffmpeg", "-y", "-v", "error", "-f", "lavfi",
+             "-i", f"gradients=s={w}x{h}:c0={c0}:c1={c1}:speed=0.03",
+             "-vframes", "1",
+             "-vf", "vignette=PI/4.5,noise=alls=5:allf=t", img], timeout=60)
+    except Exception:
+        return False
+    return os.path.exists(img)
 
 def _download(url: str, dest: str) -> bool:
     try:
@@ -73,10 +148,21 @@ def _fit_duration(mp4: str, durasi: float) -> str:
         return mp4
     return tmp if os.path.exists(tmp) else mp4
 
+def strip_audio(mp4: str) -> str:
+    """Buang audio asli klip AI (aturan: audio HANYA dari naskah, no clash)."""
+    out = mp4.replace(".mp4", "_noaud.mp4")
+    try:
+        run(["ffmpeg", "-y", "-v", "error", "-i", mp4, "-c", "copy",
+             "-an", out], timeout=120)
+    except Exception:
+        return mp4
+    return out if os.path.exists(out) else mp4
+
 def make_scene(name: str, prompt: str, durasi: float, vertikal: bool = True,
-               storyboard: str = "") -> str:
+               storyboard: str = "", strip: bool = False) -> str:
     """Buat klip adegan. prompt = prompt video AI; storyboard = deskripsi
-    statis (Ken Burns pakai ini untuk cari foto; default = prompt)."""
+    statis (Ken Burns pakai ini untuk cari foto; default = prompt).
+    strip=True: buang audio asli klip (untuk dialog TTS terpisah)."""
     mp4 = str(OUT / f"{name}.mp4")
     w, h = (1080, 1920) if vertikal else (1920, 1080)
     sb = storyboard or prompt
@@ -89,28 +175,31 @@ def make_scene(name: str, prompt: str, durasi: float, vertikal: bool = True,
         try:
             mod = __import__(f"vid_{prov}", fromlist=["generate"])
             raw = mod.generate(name, prompt, durasi, vertikal, mp4)
-            return _fit_duration(raw, durasi)
+            raw = _fit_duration(raw, durasi)
+            return strip_audio(raw) if strip else raw
         except Exception:
             continue
     return _kenburns(name, sb, durasi, w, h, mp4)
 
 def _kenburns(name: str, visual: str, durasi: float, w: int, h: int, mp4: str) -> str:
     img = str(OUT / f"{name}.jpg")
-    url = _search_image(visual)
-    if url and _download(url, img):
-        frames = max(int(durasi * 30), 30)
-        # Ken Burns: zoom pelan 1.0 -> 1.25
-        run(["ffmpeg", "-y", "-v", "error", "-loop", "1", "-i", img,
-             "-vf", f"scale={w*2}:-2,zoompan=z='1+0.25*on/{frames}':d={frames}:"
-                    f"x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s={w}x{h}:fps=30",
-             "-t", f"{durasi:.1f}", "-c:v", "libx264", "-pix_fmt", "yuv420p",
-             "-movflags", "+faststart", mp4], timeout=180)
-    else:
-        # fallback mock
-        run(["ffmpeg", "-y", "-v", "error",
-             "-f", "lavfi", "-i", f"testsrc2=size={w}x{h}:rate=30:duration={durasi:.1f}",
-             "-c:v", "libx264", "-pix_fmt", "yuv420p", "-movflags", "+faststart",
-             mp4], timeout=120)
+    got = False
+    for q in _broad_queries(visual):
+        url = _search_image(q)
+        if url and _download(url, img):
+            got = True
+            break
+    if not got:
+        # Cadangan: latar sinematik dari warna & mood adegan (bukan pola).
+        c0, c1 = _mood_colors(visual)
+        _mood_background(img, w, h, c0, c1)
+    frames = max(int(durasi * 30), 30)
+    # Ken Burns: zoom pelan 1.0 -> 1.25 (sama untuk foto maupun latar mood)
+    run(["ffmpeg", "-y", "-v", "error", "-loop", "1", "-i", img,
+         "-vf", f"scale={w*2}:-2,zoompan=z='1+0.25*on/{frames}':d={frames}:"
+                f"x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s={w}x{h}:fps=30",
+         "-t", f"{durasi:.1f}", "-c:v", "libx264", "-pix_fmt", "yuv420p",
+         "-movflags", "+faststart", mp4], timeout=180)
     return mp4
 
 def scene_for_narration(name: str, prompt: str, mp3: str, vertikal: bool = True,
