@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Storyteller AI Studio — Demo</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,'Segoe UI',Roboto,sans-serif;background:#0b0e1a;color:#e8eaf2;line-height:1.6}
+.wrap{max-width:960px;margin:0 auto;padding:24px 16px}
+.hero{text-align:center;padding:48px 0 32px}
+.hero h1{font-size:2.2rem;background:linear-gradient(90deg,#7c6cf0,#4fd1c5);-webkit-background-clip:text;background-clip:text;color:transparent}
+.hero p{color:#9aa0b8;margin-top:8px}
+.badges{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:16px}
+.badge{background:#1a1f36;border:1px solid #2a3050;padding:6px 14px;border-radius:20px;font-size:.85rem;color:#b9c0d8}
+.demo{display:flex;gap:24px;flex-wrap:wrap;justify-content:center;margin:32px 0;align-items:flex-start}
+video{width:280px;border-radius:16px;border:1px solid #2a3050;box-shadow:0 8px 40px rgba(124,108,240,.25)}
+.meta{background:#12162a;border:1px solid #232a4d;border-radius:16px;padding:20px;flex:1;min-width:280px;max-width:520px}
+.meta h3{color:#7c6cf0;margin-bottom:8px;font-size:1rem}
+.meta .row{margin:10px 0;font-size:.9rem}
+.meta .lbl{color:#9aa0b8;font-size:.75rem;text-transform:uppercase;letter-spacing:1px}
+.tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.tag{background:#1e2440;padding:3px 10px;border-radius:12px;font-size:.78rem;color:#b9c0d8}
+.flow{margin:40px 0}
+.flow h2{text-align:center;margin-bottom:24px;font-size:1.5rem}
+.step{display:flex;gap:16px;background:#12162a;border:1px solid #232a4d;border-radius:16px;padding:20px;margin-bottom:12px;align-items:flex-start}
+.num{background:linear-gradient(135deg,#7c6cf0,#4fd1c5);width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0}
+.step h3{margin-bottom:4px}
+.step p{color:#9aa0b8;font-size:.92rem}
+.step .io{margin-top:8px;font-size:.82rem;color:#6b7194}
+.step .io b{color:#4fd1c5;font-weight:600}
+.arrow{text-align:center;color:#3a4066;font-size:1.4rem;line-height:1;margin:2px 0}
+footer{text-align:center;color:#5a6080;font-size:.8rem;padding:32px 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+<div class="hero">
+<h1>Storyteller AI Studio</h1>
+<p>Ide → video storytelling siap upload. Tanpa kamera, tanpa rekam suara, tanpa editing manual.</p>
+<div class="badges"><span class="badge">Tanpa kamera</span><span class="badge">Tanpa rekam suara</span><span class="badge">Subtitle karaoke otomatis</span><span class="badge">SEO YouTube otomatis</span></div>
+</div>
+
+<div class="demo">
+<video controls playsinline preload="metadata"><source src="demo.mp4" type="video/mp4"></video>
+<div class="meta">
+<h3>Hasil demo — dibuat full oleh AI</h3>
+<div class="row"><div class="lbl">Judul</div>Kenapa Disebut Pulau Bali? Asal Usul Nama dari Kata Barui</div>
+<div class="row"><div class="lbl">Durasi / Adegan</div>80 detik · 7 adegan · 9:16 Shorts</div>
+<div class="row"><div class="lbl">Deskripsi</div>Video ini membahas asal-usul nama Bali yang berasal dari kata "Barui"... + bab per adegan + CTA subscribe.</div>
+<div class="row"><div class="lbl">Tags</div><div class="tags"><span class="tag">asal usul bali</span><span class="tag">sejarah bali</span><span class="tag">fakta unik</span><span class="tag">misteri nusantara</span><span class="tag">cerita rakyat</span><span class="tag">+15 lainnya</span></div></div>
+</div>
+</div>
+
+<div class="flow">
+<h2>Cara kerja — 5 tahap, semua AI</h2>
+
+<div class="step"><div class="num">1</div><div><h3>Rencana Konten</h3><p>Tulis topik channel. AI menyusun kalender 7–90 hari: judul, hook, dan format (Short/Long) untuk tiap slot.</p><div class="io"><b>Masuk:</b> topik → <b>Keluar:</b> kalender konten JSON</div></div></div>
+<div class="arrow">↓</div>
+<div class="step"><div class="num">2</div><div><h3>Naskah + Suara</h3><p>Klik satu judul. AI menulis naskah per adegan (visual prompt + narasi), lalu narator AI membacakan tiap adegan jadi MP3.</p><div class="io"><b>Masuk:</b> judul → <b>Keluar:</b> 7 adegan + 7 file suara</div></div></div>
+<div class="arrow">↓</div>
+<div class="step"><div class="num">3</div><div><h3>Video per Adegan</h3><p>Tiap adegan jadi klip video, durasi mengikuti panjang narasi. Slot siap untuk AI video (Dola/RunPod) — sekarang mock sinematik.</p><div class="io"><b>Masuk:</b> visual prompt → <b>Keluar:</b> 7 klip MP4</div></div></div>
+<div class="arrow">↓</div>
+<div class="step"><div class="num">4</div><div><h3>Editing + Subtitle Otomatis</h3><p>Klip dan narasi tersusun sendiri di timeline. Subtitle karaoke per kata ter-burn otomatis, volume disamakan standar YouTube (-16 LUFS).</p><div class="io"><b>Masuk:</b> 7 klip + 7 suara → <b>Keluar:</b> 1 MP4 final</div></div></div>
+<div class="arrow">↓</div>
+<div class="step"><div class="num">5</div><div><h3>SEO + Ekspor</h3><p>4 opsi judul, deskripsi dengan bab per adegan, hashtag, dan 20 tags. MP4 siap upload ke YouTube/Shorts/TikTok.</p><div class="io"><b>Masuk:</b> video final → <b>Keluar:</b> paket SEO siap tempel</div></div></div>
+</div>
+
+<footer>Storyteller AI Studio · demo pipeline · dibangun 2026-10-10</footer>
+</div>
+</body>
+</html>

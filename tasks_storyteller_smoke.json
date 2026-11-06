@@ -1,0 +1,29 @@
+{
+  "goal": "Storyteller smoke test with kenburns chain",
+  "tasks": [
+    {
+      "id": 1,
+      "name": "Prepare 1 short scene",
+      "description": "Create a short test script or job file for 1 scene",
+      "status": "completed",
+      "attempts": 1,
+      "note": "Pipeline inspected, ready"
+    },
+    {
+      "id": 2,
+      "name": "Run pipeline",
+      "description": "Execute storyteller pipeline with VIDEO_CHAIN=kenburns",
+      "status": "failed",
+      "attempts": 1,
+      "note": "Pipeline failed with code 1: line('testcat', s)\n    ^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/hatch/workspace/storyteller/pipeline.py\", line 10, in <module>\n    from voice import synthesize\n  File \"/home/hatch/workspace/storyteller/voice.py\", line 4, in <module>\n    from gtts import gTTS\nModuleNotFoundError: No module named 'gtts'\n"
+    },
+    {
+      "id": 3,
+      "name": "Verify output",
+      "description": "Verify final output mp4 exists, size > 0, duration, and resolution via ffprobe",
+      "status": "pending",
+      "attempts": 0,
+      "note": ""
+    }
+  ]
+}
